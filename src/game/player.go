@@ -11,6 +11,7 @@ type Player struct {
 	PlayerID uint
 	Name     string
 	Role     uint
+	Alive    bool
 }
 
 type Players []*Player
@@ -36,6 +37,7 @@ func MakePlayer(gameID uint) (*Player, error) {
 	}
 	p.Name = ""
 	p.Role = 0
+	p.Alive = true
 
 	_, err = p.Upload()
 
@@ -53,12 +55,12 @@ func (p *Player) Upload() (sql.Result, error) {
 		return nil, err
 	}
 
-	addGame, err := db.Db.Prepare("INSERT INTO players (gameid, playerid, name, role) VALUES (?, ?, ?, ?)")
+	addGame, err := db.Db.Prepare("INSERT INTO players (gameid, playerid, name, role, alive) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return nil, err
 	}
 
-	return addGame.Exec(p.GameID, p.PlayerID, p.Name, p.Role)
+	return addGame.Exec(p.GameID, p.PlayerID, p.Name, p.Role, p.Alive)
 }
 
 // updates database version of the game
@@ -68,12 +70,12 @@ func (p *Player) Update() (sql.Result, error) {
 		return nil, err
 	}
 
-	updateGame, err := db.Db.Prepare("UPDATE players SET name=?, role=? WHERE gameid=? AND playerid=?")
+	updateGame, err := db.Db.Prepare("UPDATE players SET name=?, role=?, alive=? WHERE gameid=? AND playerid=?")
 	if err != nil {
 		return nil, err
 	}
 
-	return updateGame.Exec(p.Name, p.Role, p.GameID, p.PlayerID)
+	return updateGame.Exec(p.Name, p.Role, p.Alive, p.GameID, p.PlayerID)
 }
 
 // gets all players in a specific game
@@ -86,7 +88,7 @@ func GetGamePlayers(game uint) (Players, error) {
 
 	players := make(Players, 0)
 
-	rows, err := db.Db.Query("SELECT playerid, name, role FROM players WHERE gameid=?", game)
+	rows, err := db.Db.Query("SELECT playerid, name, role, alive FROM players WHERE gameid=?", game)
 	if rows != nil {
 		defer rows.Close()
 	}
@@ -96,7 +98,7 @@ func GetGamePlayers(game uint) (Players, error) {
 	for rows.Next() {
 		var player Player
 		player.GameID = game
-		if err := rows.Scan(&player.PlayerID, &player.Name, &player.Role); err != nil {
+		if err := rows.Scan(&player.PlayerID, &player.Name, &player.Role, &player.Alive); err != nil {
 			return nil, err
 		}
 		players = append(players, &player)

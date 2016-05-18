@@ -104,7 +104,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
-	i, err := strconv.Atoi(vars["ID"])
+	i, err := strconv.Atoi(vars["GameID"])
 	if err != nil {
 		log.Println(err)
 		return
@@ -123,7 +123,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	h := hubMap[id]
 
-	c := &connection{send: make(chan []byte, 256), ws: ws, h: h}
+	c := &connection{send: make(chan []byte, 1024), ws: ws, h: h}
 
 	h.register <- c
 	go c.writePump()

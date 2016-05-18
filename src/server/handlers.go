@@ -2,15 +2,15 @@ package server
 
 import (
 	//	"auth"
-	//	"fmt"
+	"fmt"
 	"game"
 	"github.com/gorilla/mux"
 	// "io/ioutil"
 	//	"errors"
-	//	"log"
+	"log"
 	//	"math/rand"
 	"net/http"
-	//	"ws"
+	"ws"
 )
 
 func sexgod(w http.ResponseWriter, r *http.Request) {
@@ -60,13 +60,27 @@ func getRoles(w http.ResponseWriter, r *http.Request) {
 	WriteJson(w, genMap("Role", "Mafia"))
 }
 
-func makeMoves(w http.ResponseWriter, r *http.Request) {
+func makeMove(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	gameID, err := stringtoUint(vars["GameID"])
+	if err != nil {
+		WriteErrorString(w, "Error parsing Game ID", 400)
+		return
+	}
+
 	retMap := make(map[string]interface{})
 	retMap["UserID"] = 123
 	retMap["Target"] = 2
 	retMap["Role"] = "Mafia"
 
 	WriteJson(w, retMap)
+	if err == nil {
+		err = ws.BroadcastEvent(gameID, "Change", fmt.Sprintf("Sup"))
+		if err != nil {
+			log.Println(err)
+		}
+
+	}
 }
 
 /*

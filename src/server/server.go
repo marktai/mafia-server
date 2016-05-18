@@ -6,9 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"recaptcha"
 	"time"
-	//	"ws"
+	"ws"
 )
 
 var requireAuth bool
@@ -26,7 +25,6 @@ func Run(port int, disableAuth bool) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	r := mux.NewRouter()
 	requireAuth = !disableAuth
-	recaptcha.ReadSecret("./creds/recaptcha.json", "www.marktai.com")
 
 	// user requests
 	// r.HandleFunc("/login", Log(login)).Methods("POST")
@@ -39,13 +37,12 @@ func Run(port int, disableAuth bool) {
 	//	r.HandleFunc("/games/{ID}/info", getGame).Methods("GET")
 	//	r.HandleFunc("/games/{ID}/board", getBoard).Methods("GET")
 	//	r.HandleFunc("/games/{ID}/string", getGameString).Methods("GET")
-	//	r.HandleFunc("/games/{ID}/ws", Log(ws.ServeWs)).Methods("GET")
 	//	r.HandleFunc("/hello_world", sexgod).Methods("GET")
 	r.HandleFunc("/games", Log(makeGame)).Methods("POST")
 	r.HandleFunc("/games/{GameID:[0-9]+}/info", Log(getGameInfo)).Methods("GET")
 	r.HandleFunc("/games/{GameID:[0-9]+}/roles/{UserID:[0-9]+}", Log(getRoles)).Methods("GET")
-
-	//	r.HandleFunc("/games/{ID}", Log(makeGameMove)).Methods("POST") // only for backwards compatibility
+	r.HandleFunc("/games/{GameID:[0-9]+}/ws", Log(ws.ServeWs)).Methods("GET")
+	r.HandleFunc("/games/{GameID:[0-9]+}/move", Log(makeMove)).Methods("POST") // only for backwards compatibility
 	//	r.HandleFunc("/games/{ID}/move", Log(makeGameMove)).Methods("POST")
 	//	r.HandleFunc("/users/{userID}/games", getUserGames).Methods("GET")
 
