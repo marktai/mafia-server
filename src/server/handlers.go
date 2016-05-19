@@ -2,6 +2,7 @@ package server
 
 import (
 	//	"auth"
+	"encoding/json"
 	"fmt"
 	"game"
 	"github.com/gorilla/mux"
@@ -18,13 +19,60 @@ func sexgod(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeGame(w http.ResponseWriter, r *http.Request) {
-	var options game.GameOptions
-	options.PlayerCount = 5
+	var parsedJson map[string]uint
+	decoder := json.NewDecoder(r.Body)
+
+	err := decoder.Decode(&parsedJson)
+	if err != nil {
+		WriteErrorString(w, err.Error()+" in parsing POST body (JSON)", 400)
+		return
+	}
+
+	playerCount, ok := parsedJson["PlayerCount"]
+	if !ok {
+		WriteErrorString(w, "PlayerCount (uint) not in POST body (JSON)", 400)
+		return
+	}
+
+	mafiaCount, ok := parsedJson["MafiaCount"]
+	if !ok {
+		WriteErrorString(w, "MafiaCount (uint) not in POST body (JSON)", 400)
+		return
+	}
+
+	doctorCount, ok := parsedJson["DoctorCount"]
+	if !ok {
+		// WriteErrorString(w, "DoctorCount (uint) not in POST body (JSON)", 400)
+		// return
+		doctorCount = 0
+	}
+
+	sherriffCount, ok := parsedJson["SherriffCount"]
+	if !ok {
+		// WriteErrorString(w, "SherriffCount (uint) not in POST body (JSON)", 400)
+		// return
+		sherriffCount = 0
+	}
+
+	options := game.GameOptions{
+		PlayerCount:   playerCount,
+		MafiaCount:    mafiaCount,
+		DoctorCount:   doctorCount,
+		SherriffCount: sherriffCount,
+	}
+
+	err = options.Verify()
+	if err != nil {
+		WriteError(w, err, 400)
+		return
+	}
+
 	newGame, err := game.MakeGame(options)
 	if err != nil {
 		WriteError(w, err, 500)
 		return
 	}
+
 	WriteJson(w, genMap("GameID", newGame.GameID))
 }
 
@@ -50,6 +98,14 @@ func getPlayerInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func registerPlayer(w http.ResponseWriter, r *http.Request) {
+
+	//	vars := mux.Vars(r)
+	//	gameID, err := stringtoUint(vars["GameID"])
+	//	if err != nil {
+	//		WriteErrorString(w, "Error parsing Game ID", 400)
+	//		return
+	//	}
+
 	retMap := make(map[string]int)
 	retMap["Jay"] = 123
 	retMap["Mark"] = 456
@@ -68,18 +124,37 @@ func makeMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	retMap := make(map[string]interface{})
-	retMap["UserID"] = 123
-	retMap["Target"] = 2
-	retMap["Role"] = "Mafia"
+	playerID, err := stringtoUint(r.FormValue("PlayerID"))
+	if err != nil {
+		WriteErrorString(w, "Error parsing PlayerID (Query)", 400)
+		return
+	}
 
-	WriteJson(w, retMap)
+	targetID, err := stringtoUint(r.FormValue("TargetID"))
+	if err != nil {
+		WriteErrorString(w, "Error parsing TargetID (Query)", 400)
+		return
+	}
+
+	game, err := game.GetGame(gameID)
+	if err != nil {
+		WriteError(w, err, 500)
+		return
+	}
+
+	err = game.MakeGameMove(playerID, targetID)
+	if err != nil {
+		WriteError(w, err, 500)
+		return
+	}
+
+	w.WriteHeader(200)
+
 	if err == nil {
-		err = ws.BroadcastEvent(gameID, "Change", fmt.Sprintf("Sup"))
+		err = ws.BroadcastEvent(gameID, "Change", fmt.Sprintf("jay"))
 		if err != nil {
 			log.Println(err)
 		}
-
 	}
 }
 

@@ -4,7 +4,10 @@ import (
 	"db"
 	"fmt"
 	"strings"
+	"sync"
 )
+
+var mutexMap = make(map[string]*sync.Mutex)
 
 // checks if a id already exists in the database
 func checkGameIDConflict(id uint) (bool, error) {
@@ -34,6 +37,12 @@ func getUniqueID(idType string) (uint, error) {
 		key = "players"
 	}
 
+	mutex, ok := mutexMap[key]
+	if !ok {
+		mutexMap[key] = &sync.Mutex{}
+		mutex, _ = mutexMap[key]
+	}
+
 	var count uint
 	var scale uint
 	var addConst uint
@@ -41,6 +50,11 @@ func getUniqueID(idType string) (uint, error) {
 	var newID uint
 
 	conflict := true
+
+	// this is to prevent race conditions between acquiring ID's and updating the count
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	err := db.Db.QueryRow(fmt.Sprintf("SELECT count, scale, addConst FROM count WHERE type='%s'", key)).Scan(&count, &scale, &addConst)
 	if err != nil {
 		return 0, err

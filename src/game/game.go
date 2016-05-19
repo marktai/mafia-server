@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"db"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -13,8 +14,99 @@ const sqlForm = "2006-01-02 15:04:05"
 
 // Game is the class that represents all of the mafia game data
 
+// Stored as a 32 bit int
 type GameOptions struct {
-	PlayerCount uint
+	PlayerCount   uint // 6 bits
+	MafiaCount    uint // 4 bits
+	DoctorCount   uint // 2 bits
+	SherriffCount uint // 2 bits
+}
+
+// bit sizes of every field
+var GameOptionSizes = GameOptions{
+	PlayerCount:   6,
+	MafiaCount:    4,
+	DoctorCount:   2,
+	SherriffCount: 2,
+}
+
+func (o *GameOptions) Verify() error {
+	var max uint
+	max = 1 << GameOptionSizes.PlayerCount
+	if o.PlayerCount >= max {
+		return errors.New(fmt.Sprintf("PlayerCount is too large. Max is %d", max-1))
+	}
+
+	max = 1 << GameOptionSizes.MafiaCount
+	if o.MafiaCount >= max {
+		return errors.New(fmt.Sprintf("MafiaCount is too large. Max is %d", max-1))
+	}
+
+	max = 1 << GameOptionSizes.DoctorCount
+	if o.DoctorCount >= max {
+		return errors.New(fmt.Sprintf("DoctorCount is too large. Max is %d", max-1))
+	}
+
+	max = 1 << GameOptionSizes.SherriffCount
+	if o.SherriffCount >= max {
+		return errors.New(fmt.Sprintf("SherriffCount is too large. Max is %d", max-1))
+	}
+
+	return nil
+}
+
+func (o *GameOptions) Encode() (uint, error) {
+	err := o.Verify()
+	if err != nil {
+		return 0, err
+	}
+
+	var total uint = 0
+
+	total <<= GameOptionSizes.PlayerCount
+	total += o.PlayerCount
+
+	total <<= GameOptionSizes.MafiaCount
+	total += o.MafiaCount
+
+	total <<= GameOptionSizes.DoctorCount
+	total += o.DoctorCount
+
+	total <<= GameOptionSizes.SherriffCount
+	total += o.SherriffCount
+
+	return total, nil
+}
+
+func GetLastNBits(a, n uint) uint {
+	var mask uint = 0
+	var i uint = 0
+	for ; i < n; i++ {
+		mask |= 1 << i
+	}
+	return a & mask
+}
+
+func DecodeGameOptions(encoded uint) (*GameOptions, error) {
+	var retOptions GameOptions
+
+	retOptions.SherriffCount = GetLastNBits(encoded, GameOptionSizes.SherriffCount)
+	encoded >>= GameOptionSizes.SherriffCount
+
+	retOptions.DoctorCount = GetLastNBits(encoded, GameOptionSizes.DoctorCount)
+	encoded >>= GameOptionSizes.DoctorCount
+
+	retOptions.MafiaCount = GetLastNBits(encoded, GameOptionSizes.MafiaCount)
+	encoded >>= GameOptionSizes.MafiaCount
+
+	retOptions.PlayerCount = GetLastNBits(encoded, GameOptionSizes.PlayerCount)
+	encoded >>= GameOptionSizes.PlayerCount
+
+	if encoded != 0 {
+		return nil, errors.New("Encoded GameOption has too many bits")
+	}
+
+	return &retOptions, nil
 }
 
 // Metadata about the game
@@ -47,6 +139,7 @@ func MakeGame(options GameOptions) (*Game, error) {
 	g.TurnCount = 0
 	g.Players = make(Players, options.PlayerCount)
 	for i, _ := range g.Players {
+
 		g.Players[i], err = MakePlayer(g.GameID)
 		if err != nil {
 			return nil, err
@@ -76,9 +169,10 @@ func GetGame(gameID uint) (*Game, error) {
 	game.GameID = gameID
 
 	var started, modified string
+	var encodedOptions uint
 
 	//TODO: handle NULLS
-	err = db.Db.QueryRow("SELECT stage, started, modified, turnCount FROM games WHERE gameid=?", gameID).Scan(&game.Stage, &started, &modified, &game.TurnCount)
+	err = db.Db.QueryRow("SELECT stage, started, modified, turnCount, options FROM games WHERE gameid=?", gameID).Scan(&game.Stage, &started, &modified, &game.TurnCount, &encodedOptions)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New("Game not found")
@@ -95,6 +189,13 @@ func GetGame(gameID uint) (*Game, error) {
 		return nil, err
 	}
 
+	options, err := DecodeGameOptions(encodedOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	game.Options = *options
+
 	game.Players, err = GetGamePlayers(gameID)
 	if err != nil {
 		return nil, err
@@ -110,17 +211,22 @@ func GetGame(gameID uint) (*Game, error) {
 
 // updates database version of the game
 func (g *Game) Upload() (sql.Result, error) {
-	err := db.Db.Ping()
+	encodedOptions, err := g.Options.Encode()
 	if err != nil {
 		return nil, err
 	}
 
-	addGame, err := db.Db.Prepare("INSERT INTO games (gameid, stage, started, modified, turncount) VALUES (?, ?, ?, ?, ?)")
+	err = db.Db.Ping()
 	if err != nil {
 		return nil, err
 	}
 
-	return addGame.Exec(g.GameID, g.Stage, g.Started, g.Modified, g.TurnCount)
+	addGame, err := db.Db.Prepare("INSERT INTO games (gameid, stage, started, modified, turncount, options) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return nil, err
+	}
+
+	return addGame.Exec(g.GameID, g.Stage, g.Started, g.Modified, g.TurnCount, encodedOptions)
 }
 
 // updates database version of the game
@@ -135,56 +241,40 @@ func (g *Game) Update() (sql.Result, error) {
 		return nil, err
 	}
 
-	return updateGame.Exec(g.Stage, g.Started, g.Modified, g.TurnCount, g.GameID)
+	result, err := updateGame.Exec(g.Stage, g.Started, g.Modified, g.TurnCount, g.GameID)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-/*
 // Validates and then makes a move
-func (g *Game) MakeMove(player, box, square uint) error {
-	if g.Board.Box().CheckOwned() != 0 {
-		return errors.New("Game already finished")
+func (g *Game) MakeGameMove(playerID uint, targetID uint) error {
+	var role uint
+	for _, player := range g.Players {
+		if player.PlayerID == playerID {
+			role = player.Role
+			break
+		}
 	}
 
-	playerTurn := g.Turn / 10 % 2
-	if player != g.Players[playerTurn] {
-		return errors.New("Not player's turn")
-	}
-
-	moveBox := g.Turn % 10
-
-	if moveBox != 9 && box != moveBox {
-		return errors.New("Not correct box")
-	}
-
-	if box > 8 {
-		return errors.New("Box out of range")
-	}
-
-	if g.Board[box].Owned != 0 {
-		return errors.New("Box already taken")
-	}
-
-	if square > 8 {
-		return errors.New("Square out of range")
-	}
-
-	err := g.Board[box].MakeMove(playerTurn+1, square)
+	move, err := MakeMove(g.GameID, g.TurnCount, playerID, targetID, role)
 	if err != nil {
 		return err
 	}
 
-	g.MoveHistory.AddMove(9*box + square)
+	// so we dont invalidate the game object
+	g.Moves = append(Moves{move}, g.Moves...) //prepend
 	g.Modified = time.Now().UTC()
-
-	g.Turn = (1 - playerTurn) * 10
-	if g.Board[square].Owned != 0 {
-		g.Turn += 9
-	} else {
-		g.Turn += square
+	_, err = g.Upload()
+	if err != nil {
+		return err
 	}
-
-	g.CheckVictor()
 
 	return nil
 }
-*/
+
+func (g *Game) GetCurrentMoves() (Moves, error) {
+	return GetGameTurnMoves(g.GameID, g.TurnCount)
+}

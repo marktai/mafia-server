@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -14,6 +15,7 @@ func stringtoUint(s string) (uint, error) {
 }
 
 func WriteError(w http.ResponseWriter, err error, errorCode int) {
+	log.Println(err)
 	errorMap := make(map[string]string)
 	errorMap["Error"] = fmt.Sprintf("%s", err)
 	jsonOut, _ := json.Marshal(errorMap)
