@@ -499,16 +499,27 @@ func (g *Game) ProgressStage() error {
 			return err
 		}
 	}
+
 	g.TurnCount += 1
+
+	if g.CheckFinish() {
+		err = ws.BroadcastEvent(g.GameID, "Victory", g.Stage)
+		if err != nil {
+			log.Println(err)
+		}
+	} else {
+
+		err = ws.BroadcastEvent(g.GameID, "Turn", g.TurnCount)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
 	_, err = g.Update()
 	if err != nil {
 		return err
 	}
 
-	err = ws.BroadcastEvent(g.GameID, "Turn", g.TurnCount)
-	if err != nil {
-		log.Println(err)
-	}
 	return nil
 }
 
@@ -647,6 +658,30 @@ func (g *Game) processDay() (int, error) {
 	g.StageFinish = time.Now().Add(time.Duration(g.Options.NightTimeIntervals) * 15 * time.Second)
 
 	return returnCode, nil
+}
+
+func (g *Game) CheckFinish() bool {
+	mafiaWin := true
+	townWin := true
+	for _, player := range g.Players {
+
+		if player.Role == 2 {
+			// if any mafia alive, town has not won yet
+			townWin = false
+		} else {
+			// if anyone but mafia alive, mafia has not won yet
+			mafiaWin = false
+		}
+	}
+	if townWin {
+		g.Stage = 11
+	}
+
+	if mafiaWin {
+		g.Stage = 12
+	}
+
+	return townWin || mafiaWin
 }
 
 func (g *Game) FindPlayerWithID(playerID uint) (*Player, error) {
