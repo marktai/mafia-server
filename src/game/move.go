@@ -3,7 +3,6 @@ package game
 import (
 	"database/sql"
 	"db"
-	"log"
 	"sort"
 	"time"
 )
@@ -36,19 +35,6 @@ func MakeMove(gameID, turnCount, playerID, targetID, moveType uint) (*Move, erro
 	if err != nil {
 		return nil, err
 	}
-	createdMoves, err := GetGamePlayerTurnMoves(gameID, playerID, turnCount)
-	if err != nil {
-		log.Println("in move")
-		log.Println(err)
-		return nil, err
-	} else if len(createdMoves) > 0 {
-		createdMoves[0].TargetID = targetID
-		createdMoves[0].Type = moveType
-		_, err := createdMoves[0].Update()
-		return createdMoves[0], err
-
-	}
-
 	var m Move
 
 	m.GameID = gameID

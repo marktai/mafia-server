@@ -43,6 +43,9 @@ func Run(port int, disableAuth bool) {
 	r.HandleFunc("/games/{GameID:[0-9]+}/roles/{UserID:[0-9]+}", Log(getRoles)).Methods("GET")
 	r.HandleFunc("/games/{GameID:[0-9]+}/ws", Log(ws.ServeWs)).Methods("GET")
 	r.HandleFunc("/games/{GameID:[0-9]+}/move", Log(makeMove)).Methods("POST") // only for backwards compatibility
+	r.HandleFunc("/games/{GameID:[0-9]+}/deviceRegister", Log(registerPlayer)).Methods("POST")
+	r.HandleFunc("/games/{GameID:[0-9]+}/progressStage", Log(progressStage)).Methods("POST")
+
 	//	r.HandleFunc("/games/{ID}/move", Log(makeGameMove)).Methods("POST")
 	//	r.HandleFunc("/users/{userID}/games", getUserGames).Methods("GET")
 

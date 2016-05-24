@@ -48,6 +48,32 @@ func MakePlayer(gameID uint) (*Player, error) {
 	return &p, nil
 }
 
+// func UpdatePlayer(gameID uint, name string) (*Player, error) {
+// 	err := db.Db.Ping()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var p Player
+// 	p.GameID = gameID
+// 	p.PlayerID, err = getUniquePlayerID()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	p.Name = name
+// 	p.Role = 0
+// 	p.Alive = true
+
+// 	_, err = p.Update()
+
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &p, nil
+
+// }
+
 // updates database version of the game
 func (p *Player) Upload() (sql.Result, error) {
 	err := db.Db.Ping()
