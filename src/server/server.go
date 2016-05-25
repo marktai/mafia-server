@@ -38,6 +38,7 @@ func Run(port int, disableAuth bool) {
 	//	r.HandleFunc("/games/{ID}/board", getBoard).Methods("GET")
 	//	r.HandleFunc("/games/{ID}/string", getGameString).Methods("GET")
 	//	r.HandleFunc("/hello_world", sexgod).Methods("GET")
+	r.HandleFunc("/games", Log(getGames)).Methods("GET")
 	r.HandleFunc("/games", Log(makeGame)).Methods("POST")
 	r.HandleFunc("/games/{GameID:[0-9]+}/info", Log(getGameInfo)).Methods("GET")
 	r.HandleFunc("/games/{GameID:[0-9]+}/roles/{UserID:[0-9]+}", Log(getRoles)).Methods("GET")

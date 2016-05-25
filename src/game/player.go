@@ -10,10 +10,14 @@ type Player struct {
 	GameID   uint
 	PlayerID uint
 	Name     string
-	Role     uint
+	role     uint // private to not show in info
 	Alive    bool
 }
 
+type PlayerIDRole struct {
+	PlayerID uint
+	Role     uint
+}
 type Players []*Player
 
 //sorts by most recent first
@@ -36,7 +40,7 @@ func MakePlayer(gameID uint) (*Player, error) {
 		return nil, err
 	}
 	p.Name = ""
-	p.Role = 0
+	p.role = 0
 	p.Alive = true
 
 	_, err = p.Upload()
@@ -61,7 +65,7 @@ func MakePlayer(gameID uint) (*Player, error) {
 // 		return nil, err
 // 	}
 // 	p.Name = name
-// 	p.Role = 0
+// 	p.role = 0
 // 	p.Alive = true
 
 // 	_, err = p.Update()
@@ -86,7 +90,7 @@ func (p *Player) Upload() (sql.Result, error) {
 		return nil, err
 	}
 
-	return addGame.Exec(p.GameID, p.PlayerID, p.Name, p.Role, p.Alive)
+	return addGame.Exec(p.GameID, p.PlayerID, p.Name, p.role, p.Alive)
 }
 
 // updates database version of the game
@@ -101,7 +105,7 @@ func (p *Player) Update() (sql.Result, error) {
 		return nil, err
 	}
 
-	return updateGame.Exec(p.Name, p.Role, p.Alive, p.GameID, p.PlayerID)
+	return updateGame.Exec(p.Name, p.role, p.Alive, p.GameID, p.PlayerID)
 }
 
 // gets all players in a specific game
@@ -124,7 +128,7 @@ func GetGamePlayers(game uint) (Players, error) {
 	for rows.Next() {
 		var player Player
 		player.GameID = game
-		if err := rows.Scan(&player.PlayerID, &player.Name, &player.Role, &player.Alive); err != nil {
+		if err := rows.Scan(&player.PlayerID, &player.Name, &player.role, &player.Alive); err != nil {
 			return nil, err
 		}
 		players = append(players, &player)
@@ -136,4 +140,8 @@ func GetGamePlayers(game uint) (Players, error) {
 	sort.Sort(players)
 
 	return players, nil
+}
+
+func (p *Player) PlayerIDRole() PlayerIDRole {
+	return PlayerIDRole{p.PlayerID, p.role}
 }

@@ -13,6 +13,16 @@ func sexgod(w http.ResponseWriter, r *http.Request) {
 	WriteJson(w, genMap("ID", "fuck mark"))
 }
 
+func getGames(w http.ResponseWriter, r *http.Request) {
+	games, err := game.GetAllGames()
+	if err != nil {
+		WriteError(w, err, 500)
+		return
+	}
+
+	WriteJson(w, genMap("Games", games))
+}
+
 func makeGame(w http.ResponseWriter, r *http.Request) {
 	var parsedJson map[string]uint
 	decoder := json.NewDecoder(r.Body)
@@ -128,7 +138,9 @@ func registerPlayer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	WriteJson(w, g.PlayerMap())
+	roles := g.NamesToPlayerIDRoles(parsedJson["PlayerNames"])
+
+	WriteJson(w, roles)
 }
 
 func getRoles(w http.ResponseWriter, r *http.Request) {

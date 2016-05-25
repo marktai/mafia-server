@@ -282,7 +282,7 @@ func (g *Game) MakeGameMove(playerID uint, targetID uint, moveType uint) (map[st
 	}
 
 	if g.Stage == 1 {
-		if p.Role != moveType {
+		if p.role != moveType {
 			return nil, errors.New("Invalid move type, wrong role")
 		}
 	} else if g.Stage == 2 {
@@ -303,7 +303,7 @@ func (g *Game) MakeGameMove(playerID uint, targetID uint, moveType uint) (map[st
 		g.Moves = append(Moves{move}, g.Moves...) //prepend
 	} else {
 		// if the player already made a move
-		if p.Role == 4 { // sherriff
+		if p.role == 4 { // sherriff
 			return nil, errors.New("Sherriff cannot change his move")
 		}
 		for _, move := range g.Moves {
@@ -379,7 +379,7 @@ func (g *Game) ProcessSherriffMove(targetID uint) (bool, error) {
 		return false, err
 	}
 
-	return p.Role == 2, nil
+	return p.role == 2, nil
 }
 
 func (g *Game) GetCurrentMoves() (Moves, error) {
@@ -407,8 +407,12 @@ func (g *Game) RegisterPlayer(name string) error {
 		}
 	}
 
+	if unnamedCount == 0 || emptyPlayer == nil {
+		return errors.New("No more available players to register")
+	}
+
 	emptyPlayer.Name = name
-	emptyPlayer.Role, err = g.GenerateRole()
+	emptyPlayer.role, err = g.GenerateRole()
 	if err != nil {
 		return err
 	}
@@ -441,11 +445,11 @@ func (g *Game) GenerateRole() (uint, error) {
 	// 4 is sherriff
 
 	for _, player := range g.Players {
-		if player.Role == 0 {
+		if player.role == 0 {
 			continue
 		} else {
 			roleCounts[0] += 1
-			roleCounts[player.Role] += 1
+			roleCounts[player.role] += 1
 		}
 	}
 
@@ -537,7 +541,7 @@ func (g *Game) processNight() (int, error) {
 		if err != nil {
 			return returnCode, err
 		}
-		if player.Role != move.Type { // bad move by player
+		if player.role != move.Type { // bad move by player
 			continue
 		}
 		if move.Type == 2 {
@@ -665,7 +669,7 @@ func (g *Game) CheckFinish() bool {
 	townWin := true
 	for _, player := range g.Players {
 
-		if player.Role == 2 {
+		if player.role == 2 {
 			// if any mafia alive, town has not won yet
 			townWin = false
 		} else {
@@ -702,4 +706,51 @@ func (g *Game) PlayerMap() map[string]uint {
 		playerMap[player.Name] = player.PlayerID
 	}
 	return playerMap
+}
+
+func (g *Game) NamesToPlayerIDRoles(playerNames []string) map[string]PlayerIDRole {
+	allPlayerMap := make(map[string]*Player)
+	for _, player := range g.Players {
+		if player == nil || player.Name == "" {
+			continue
+		}
+		allPlayerMap[player.Name] = player
+	}
+
+	retPlayerMap := make(map[string]PlayerIDRole)
+	for _, playerName := range playerNames {
+		retPlayerMap[playerName] = allPlayerMap[playerName].PlayerIDRole()
+	}
+	return retPlayerMap
+
+}
+
+// Returns all games
+func GetAllGames() ([]uint, error) {
+	err := db.Db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
+	games := make([]uint, 0)
+
+	rows, err := db.Db.Query("SELECT gameid FROM games ORDER BY modified DESC")
+	if rows != nil {
+		defer rows.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var gameID uint
+		if err := rows.Scan(&gameID); err != nil {
+			return nil, err
+		}
+		games = append(games, gameID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return games, nil
 }
